@@ -182,7 +182,7 @@ export default function LoginPage() {
 
             <Box sx={{ mt: 3, textAlign: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                <StatusIcon sx={{ color: 'success.main', fontSize: 10 }} />
+                {/* <StatusIcon sx={{ color: 'success.main', fontSize: 10 }} /> */}
                 <Typography variant="caption" color="text.secondary">
                   Authorized Personnel Only
                 </Typography>
