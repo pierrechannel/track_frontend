@@ -326,7 +326,6 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
         }}
       >
         <Typography variant="caption" color="text.secondary">
-          © OpenStreetMap contributors
         </Typography>
       </Box>
     </Box>
