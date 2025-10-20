@@ -1,5 +1,6 @@
-import React from 'react';
-import { MapContainer as LeafletMap, TileLayer, Marker, Popup } from 'react-leaflet';
+import React, { useEffect } from 'react';
+import { MapContainer as LeafletMap, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { Box, Typography } from '@mui/material';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -11,11 +12,24 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+// Component to handle map invalidation
+function MapInvalidator() {
+  const map = useMap();
+  
+  useEffect(() => {
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+  }, [map]);
+  
+  return null;
+}
+
 export default function MapContainer({ devices, locations, onDeviceClick, selectedDevice }) {
   const center = [-3.3731, 29.3644]; // Bujumbura
   
   const createCustomIcon = (device, isSelected) => {
-    const color = device.status === 'active' ? (isSelected ? '#3b82f6' : '#10b981') : '#6b7280';
+    const color = device.status === 'active' ? (isSelected ? '#1976d2' : '#2e7d32') : '#757575';
     return L.divIcon({
       className: 'custom-marker',
       html: `
@@ -45,12 +59,15 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
     <LeafletMap
       center={center}
       zoom={13}
-      style={{ height: '100%', width: '100%' }}
-      className="z-0"
+      style={{ height: '100%', width: '100%', zIndex: 0 }}
+      scrollWheelZoom={true}
     >
+      <MapInvalidator />
+      
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        maxZoom={19}
       />
       
       {devices.map((device) => {
@@ -67,8 +84,14 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
             }}
           >
             <Popup>
-              <div className="font-medium">{device.unit_name}</div>
-              <div className="text-sm text-gray-600">Battery: {device.battery_level}%</div>
+              <Box sx={{ p: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  {device.unit_name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Battery: {device.battery_level}%
+                </Typography>
+              </Box>
             </Popup>
           </Marker>
         );
