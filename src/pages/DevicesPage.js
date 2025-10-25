@@ -22,10 +22,10 @@ import LocationDialog from '../components/LocationDialog';
 const initialFormData = {
   device_code: '',
   imei: '',
-  unit_name: '',
+  device_name: '',
+  unit: '',
   status: 'active',
   battery_level: 100,
-  assigned_to_name: '',
 };
 
 export default function DevicesPage() {
@@ -51,11 +51,31 @@ export default function DevicesPage() {
 
   const loadDevices = async () => {
     try {
+      setLoading(true);
       const response = await devicesAPI.getAll();
-      setDevices(response.data.results || response.data);
+      
+      // Handle both paginated and non-paginated responses
+      const deviceData = response.data.results || response.data;
+      console.log('Loaded devices:', deviceData);
+      
+      setDevices(Array.isArray(deviceData) ? deviceData : []);
     } catch (error) {
       console.error('Failed to load devices:', error);
-      showSnackbar('Failed to load devices', 'error');
+      
+      // Detailed error logging
+      if (error.response) {
+        console.error('API Error:', error.response.status, error.response.data);
+      } else if (error.request) {
+        console.error('Network Error - No response received');
+      } else {
+        console.error('Error:', error.message);
+      }
+      
+      showSnackbar(
+        error.response?.data?.detail || 'Failed to load devices. Check console for details.',
+        'error'
+      );
+      setDevices([]);
     } finally {
       setLoading(false);
     }
@@ -76,10 +96,10 @@ export default function DevicesPage() {
       setFormData({
         device_code: device.device_code,
         imei: device.imei || '',
-        unit_name: device.unit_name,
+        device_name: device.device_name,
+        unit: device.unit,
         status: device.status,
         battery_level: device.battery_level,
-        assigned_to_name: device.assigned_to_name || '',
       });
     } else {
       setEditMode(false);
@@ -100,22 +120,73 @@ export default function DevicesPage() {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleSubmit = async () => {
-    try {
-      if (editMode && currentDevice) {
-        await devicesAPI.update(currentDevice.id, formData);
-        showSnackbar('Device updated successfully');
-      } else {
-        await devicesAPI.create(formData);
-        showSnackbar('Device created successfully');
-      }
-      handleCloseDialog();
-      loadDevices();
-    } catch (error) {
-      console.error('Failed to save device:', error);
-      showSnackbar('Failed to save device', 'error');
+const handleSubmit = async () => {
+  try {
+    // Prepare data for submission with detailed logging
+    const submitData = {
+      device_code: formData.device_code.trim(),
+      imei: formData.imei.trim(),
+      device_name: formData.device_name.trim(),
+      unit: formData.unit, // This should be a UUID string
+      status: formData.status,
+      battery_level: parseInt(formData.battery_level),
+    };
+
+    console.log('📤 Submitting device data:', JSON.stringify(submitData, null, 2));
+    console.log('🔍 Unit value type:', typeof submitData.unit, 'Value:', submitData.unit);
+
+    if (editMode && currentDevice) {
+      console.log('🔄 Updating device:', currentDevice.id);
+      const response = await devicesAPI.update(currentDevice.id, submitData);
+      console.log('✅ Update response:', response.data);
+      showSnackbar('Device updated successfully');
+    } else {
+      console.log('🆕 Creating new device');
+      const response = await devicesAPI.create(submitData);
+      console.log('✅ Create response:', response.data);
+      showSnackbar('Device created successfully');
     }
-  };
+    
+    handleCloseDialog();
+    loadDevices();
+  } catch (error) {
+    console.error('❌ Failed to save device:', error);
+    
+    // Enhanced error logging
+    if (error.response) {
+      console.error('📡 API Response Status:', error.response.status);
+      console.error('📡 API Response Data:', error.response.data);
+      console.error('📡 API Response Headers:', error.response.headers);
+    } else if (error.request) {
+      console.error('🌐 No response received:', error.request);
+    } else {
+      console.error('💥 Error message:', error.message);
+    }
+
+    // Better error message extraction
+    let errorMessage = 'Failed to save device';
+    if (error.response?.data) {
+      // Handle Django REST framework validation errors
+      const errorData = error.response.data;
+      
+      if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData.detail) {
+        errorMessage = errorData.detail;
+      } else if (errorData.non_field_errors) {
+        errorMessage = errorData.non_field_errors.join(', ');
+      } else {
+        // Extract field-specific errors
+        const fieldErrors = Object.entries(errorData)
+          .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+          .join('; ');
+        errorMessage = fieldErrors || JSON.stringify(errorData);
+      }
+    }
+    
+    showSnackbar(errorMessage, 'error');
+  }
+};
 
   const handleOpenDeleteDialog = (deviceId) => {
     setDeleteDialog({ open: true, deviceId });
@@ -190,7 +261,6 @@ export default function DevicesPage() {
         <Grid container spacing={3}>
           {devices.map((device, index) => (
             <Grid item xs={12} sm={6} lg={4} key={device.id}>
-              {/* Remplacement de Zoom par Fade avec délai progressif */}
               <Fade in={true} timeout={500} style={{ transitionDelay: `${index * 100}ms` }}>
                 <Box>
                   <DeviceCard

@@ -11,10 +11,11 @@ import {
 import {
   Battery80 as BatteryIcon,
   SignalCellularAlt as SignalIcon,
-  MyLocation as LocationIcon,  // Correction ici
+  MyLocation as LocationIcon,
   Circle as StatusIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Business as UnitIcon,
 } from '@mui/icons-material';
 
 const DeviceCard = ({ device, onEdit, onDelete, onViewLocation }) => {
@@ -39,7 +40,7 @@ const DeviceCard = ({ device, onEdit, onDelete, onViewLocation }) => {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
           <Box>
             <Typography variant="h6" fontWeight={600} gutterBottom>
-              {device.unit_name}
+              {device.device_name}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
               {device.device_code}
@@ -98,6 +99,25 @@ const DeviceCard = ({ device, onEdit, onDelete, onViewLocation }) => {
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {/* Unit Information */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: 1, borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <UnitIcon fontSize="small" color="action" />
+              <Typography variant="body2" color="text.secondary">Unit</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <Typography variant="body2" fontWeight={600}>
+                {device.unit_name || 'No Unit'}
+              </Typography>
+              {device.unit_code && (
+                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                  {device.unit_code}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+
+          {/* Assigned To */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: 1, borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <SignalIcon fontSize="small" color="action" />
@@ -107,6 +127,8 @@ const DeviceCard = ({ device, onEdit, onDelete, onViewLocation }) => {
               {device.assigned_to_name || 'Unassigned'}
             </Typography>
           </Box>
+
+          {/* IMEI */}
           {device.imei && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: 1, borderColor: 'divider' }}>
               <Typography variant="body2" color="text.secondary">IMEI</Typography>
