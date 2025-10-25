@@ -262,7 +262,7 @@ export default function LoginPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                Secure Military Tracking System
+                {/* Secure Military Tracking System */}
               </Typography>
             </Box>
 
