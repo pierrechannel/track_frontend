@@ -10,6 +10,7 @@ import DevicesPage from './pages/DevicesPage';
 import MissionsPage from './pages/MissionsPage';
 import AlertsPage from './pages/AlertsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import UsersManagementPage from './pages/UserPage';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="missions" element={<MissionsPage />} />
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="users" element={<UsersManagementPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

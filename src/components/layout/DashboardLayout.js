@@ -35,6 +35,10 @@ import {
   FiberManualRecord as StatusIcon,
   Close as CloseIcon,
   TrendingUp as TrendingUpIcon,
+  
+} from '@mui/icons-material';
+import { 
+  ManageAccounts,   // User management
 } from '@mui/icons-material';
 import { useStore } from '../../store/useStore';
 import { wsClient } from '../../services/websocket';
@@ -132,6 +136,7 @@ export default function DashboardLayout() {
       badge: alerts.filter(a => !a.acknowledged).length 
     },
     { name: 'Analytics', path: '/analytics', icon: AnalyticsIcon, color: '#10b981' },
+    { name: 'Users', path: '/users', icon: ManageAccounts, color: '#10b981' }, // Settings focus
   ];
 
   const unacknowledgedCount = alerts.filter(a => !a.acknowledged).length;

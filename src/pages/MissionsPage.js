@@ -1,15 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
   Typography,
   Chip,
-  Grid,
   CircularProgress,
-  Avatar,
   Fade,
-  Grow,
   Button,
   Dialog,
   DialogTitle,
@@ -20,8 +15,6 @@ import {
   IconButton,
   Alert,
   Snackbar,
-  Tabs,
-  Tab,
   Table,
   TableBody,
   TableCell,
@@ -29,13 +22,13 @@ import {
   TableHead,
   TableRow,
   Paper,
+  TablePagination,
+  TableSortLabel,
+  Tooltip,
+  Grid,
 } from '@mui/material';
 import {
   TrackChanges as MissionIcon,
-  CalendarToday as CalendarIcon,
-  Person as PersonIcon,
-  Devices as DevicesIcon,
-  AccessTime as TimeIcon,
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
@@ -64,6 +57,12 @@ export default function MissionsPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, missionId: null });
   const [trackDialog, setTrackDialog] = useState({ open: false, mission: null, locations: [] });
   const [trackLoading, setTrackLoading] = useState(false);
+  
+  // Table state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [orderBy, setOrderBy] = useState('start_date');
+  const [order, setOrder] = useState('desc');
 
   useEffect(() => {
     loadMissions();
@@ -205,6 +204,22 @@ export default function MissionsPage() {
     setTrackDialog({ open: false, mission: null, locations: [] });
   };
 
+  // Table sorting handlers
+  const handleRequestSort = (property) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'active': return 'success';
@@ -214,6 +229,29 @@ export default function MissionsPage() {
       default: return 'default';
     }
   };
+
+  // Sort missions
+  const sortedMissions = [...missions].sort((a, b) => {
+    let aValue = a[orderBy];
+    let bValue = b[orderBy];
+
+    if (orderBy === 'start_date' || orderBy === 'end_date') {
+      aValue = aValue ? new Date(aValue).getTime() : 0;
+      bValue = bValue ? new Date(bValue).getTime() : 0;
+    }
+
+    if (order === 'asc') {
+      return aValue > bValue ? 1 : -1;
+    } else {
+      return aValue < bValue ? 1 : -1;
+    }
+  });
+
+  // Paginate missions
+  const paginatedMissions = sortedMissions.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   if (loading) {
     return (
@@ -245,194 +283,7 @@ export default function MissionsPage() {
           </Button>
         </Box>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {missions.map((mission, index) => (
-            <Grow in={true} key={mission.id} style={{ transitionDelay: `${index * 100}ms` }}>
-              <Card>
-                <CardContent sx={{ p: 3 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 3 }}>
-                    <Box sx={{ display: 'flex', gap: 2, flex: 1 }}>
-                      <Avatar
-                        sx={{
-                          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                          width: 56,
-                          height: 56,
-                        }}
-                      >
-                        <MissionIcon />
-                      </Avatar>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="h5" fontWeight={700} gutterBottom>
-                          {mission.name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {mission.description}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Chip
-                        label={mission.status.toUpperCase()}
-                        color={getStatusColor(mission.status)}
-                        sx={{ fontWeight: 600 }}
-                      />
-                      {mission.status === 'active' && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<LocationIcon />}
-                          onClick={() => handleTrackMission(mission)}
-                        >
-                          Track
-                        </Button>
-                      )}
-                      <IconButton size="small" onClick={() => handleOpenDialog(mission)} color="primary">
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" onClick={() => handleOpenDeleteDialog(mission.id)} color="error">
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </Box>
-
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Box
-                        sx={{
-                          background: 'rgba(59, 130, 246, 0.05)',
-                          border: '1px solid rgba(59, 130, 246, 0.1)',
-                          borderRadius: 2,
-                          p: 2,
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <CalendarIcon fontSize="small" color="primary" />
-                          <Typography variant="caption" color="text.secondary">
-                            Start Date
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2" fontWeight={600}>
-                          {new Date(mission.start_date).toLocaleDateString()}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(mission.start_date).toLocaleTimeString()}
-                        </Typography>
-                      </Box>
-                    </Grid>
-
-                    {mission.end_date && (
-                      <Grid item xs={12} sm={6} md={3}>
-                        <Box
-                          sx={{
-                            background: 'rgba(139, 92, 246, 0.05)',
-                            border: '1px solid rgba(139, 92, 246, 0.1)',
-                            borderRadius: 2,
-                            p: 2,
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <TimeIcon fontSize="small" color="secondary" />
-                            <Typography variant="caption" color="text.secondary">
-                              End Date
-                            </Typography>
-                          </Box>
-                          <Typography variant="body2" fontWeight={600}>
-                            {new Date(mission.end_date).toLocaleDateString()}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(mission.end_date).toLocaleTimeString()}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    )}
-
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Box
-                        sx={{
-                          background: 'rgba(16, 185, 129, 0.05)',
-                          border: '1px solid rgba(16, 185, 129, 0.1)',
-                          borderRadius: 2,
-                          p: 2,
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <PersonIcon fontSize="small" color="success" />
-                          <Typography variant="caption" color="text.secondary">
-                            Commander
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2" fontWeight={600}>
-                          {mission.commander_name || 'Unassigned'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Mission Lead
-                        </Typography>
-                      </Box>
-                    </Grid>
-
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Box
-                        sx={{
-                          background: 'rgba(245, 158, 11, 0.05)',
-                          border: '1px solid rgba(245, 158, 11, 0.1)',
-                          borderRadius: 2,
-                          p: 2,
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <DevicesIcon fontSize="small" color="warning" />
-                          <Typography variant="caption" color="text.secondary">
-                            Deployed Units
-                          </Typography>
-                        </Box>
-                        <Typography variant="h4" fontWeight={700}>
-                          {mission.device_count || 0}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Active Devices
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  </Grid>
-
-                  {mission.status === 'active' && (
-                    <Box
-                      sx={{
-                        mt: 3,
-                        p: 2,
-                        background: 'rgba(16, 185, 129, 0.1)',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
-                        borderRadius: 2,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          bgcolor: 'success.main',
-                          animation: 'pulse 2s infinite',
-                          '@keyframes pulse': {
-                            '0%, 100%': { opacity: 1 },
-                            '50%': { opacity: 0.5 },
-                          },
-                        }}
-                      />
-                      <Typography variant="body2" color="success.main" fontWeight={600}>
-                        Mission in Progress
-                      </Typography>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grow>
-          ))}
-        </Box>
-
-        {missions.length === 0 && (
+        {missions.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <MissionIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
             <Typography variant="h6" color="text.secondary">
@@ -442,6 +293,188 @@ export default function MissionsPage() {
               Click "Add Mission" to create your first mission
             </Typography>
           </Box>
+        ) : (
+          <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+            <TableContainer sx={{ maxHeight: 650 }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === 'name'}
+                        direction={orderBy === 'name' ? order : 'asc'}
+                        onClick={() => handleRequestSort('name')}
+                      >
+                        <strong>Mission Name</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <strong>Description</strong>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === 'status'}
+                        direction={orderBy === 'status' ? order : 'asc'}
+                        onClick={() => handleRequestSort('status')}
+                      >
+                        <strong>Status</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === 'start_date'}
+                        direction={orderBy === 'start_date' ? order : 'asc'}
+                        onClick={() => handleRequestSort('start_date')}
+                      >
+                        <strong>Start Date</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === 'end_date'}
+                        direction={orderBy === 'end_date' ? order : 'asc'}
+                        onClick={() => handleRequestSort('end_date')}
+                      >
+                        <strong>End Date</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === 'commander_name'}
+                        direction={orderBy === 'commander_name' ? order : 'asc'}
+                        onClick={() => handleRequestSort('commander_name')}
+                      >
+                        <strong>Commander</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell align="center">
+                      <strong>Devices</strong>
+                    </TableCell>
+                    <TableCell align="center">
+                      <strong>Actions</strong>
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {paginatedMissions.map((mission) => (
+                    <TableRow key={mission.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={600}>
+                          {mission.name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            maxWidth: 250,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {mission.description}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={mission.status.toUpperCase()}
+                          color={getStatusColor(mission.status)}
+                          size="small"
+                          sx={{ fontWeight: 600, minWidth: 90 }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {new Date(mission.start_date).toLocaleDateString()}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(mission.start_date).toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {mission.end_date ? (
+                          <>
+                            <Typography variant="body2">
+                              {new Date(mission.end_date).toLocaleDateString()}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(mission.end_date).toLocaleTimeString([], { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </Typography>
+                          </>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            N/A
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {mission.commander_name || 'Unassigned'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={mission.device_count || 0}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                          {mission.status === 'active' && (
+                            <Tooltip title="Track Mission">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleTrackMission(mission)}
+                                color="success"
+                              >
+                                <LocationIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <Tooltip title="Edit">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenDialog(mission)}
+                              color="primary"
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenDeleteDialog(mission.id)}
+                              color="error"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              component="div"
+              count={missions.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </Paper>
         )}
 
         {/* Create/Edit Dialog */}
