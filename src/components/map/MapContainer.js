@@ -1,26 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer as LeafletMap, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { 
-  Box, 
-  Typography, 
-  Chip, 
-  Card, 
-  CardContent, 
-  useTheme,
-  useMediaQuery,
-  Fade,
-  Zoom
-} from '@mui/material';
-import { 
-  Battery20, 
-  Battery50, 
-  Battery80, 
-  BatteryFull,
-  LocationOn,
-  SignalCellularAlt 
-} from '@mui/icons-material';
+import React, { useState, useMemo } from 'react';
+import { MapContainer as LeafletMap, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { Box, Card, CardContent, Typography, Fade, useTheme, useMediaQuery, Button, IconButton, Tooltip } from '@mui/material';
+import { LocationOn, SignalCellularAlt, Download, Straighten } from '@mui/icons-material';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { MapInvalidator, ModernTileLayer } from './MapHelpers';
+import { BatteryIcon, StatusChip } from './MapComponents';
+import { createCustomIcon, getDeviceStatus, calculateDistance, exportToCSV } from './MapUtils';
 
 // Fix for default markers
 delete L.Icon.Default.prototype._getIconUrl;
@@ -30,136 +16,55 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Component to handle map invalidation
-function MapInvalidator() {
-  const map = useMap();
-  
-  useEffect(() => {
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 100);
-  }, [map]);
-  
-  return null;
-}
-
-// Custom tile layer with modern style
-const ModernTileLayer = () => (
-  <TileLayer
-    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-    maxZoom={19}
-  />
-);
-
-// Battery icon component
-const BatteryIcon = ({ level }) => {
-  const theme = useTheme();
-  const getBatteryIcon = () => {
-    if (level >= 80) return <BatteryFull sx={{ color: theme.palette.success.main }} />;
-    if (level >= 60) return <Battery80 sx={{ color: theme.palette.success.light }} />;
-    if (level >= 40) return <Battery50 sx={{ color: theme.palette.warning.main }} />;
-    return <Battery20 sx={{ color: theme.palette.error.main }} />;
-  };
-
-  return getBatteryIcon();
-};
-
-// Status chip component
-const StatusChip = ({ status }) => {
-  const theme = useTheme();
-  
-  const statusConfig = {
-    active: {
-      label: 'Active',
-      color: 'success',
-      variant: 'filled'
-    },
-    inactive: {
-      label: 'Inactive',
-      color: 'default',
-      variant: 'outlined'
-    },
-    warning: {
-      label: 'Warning',
-      color: 'warning',
-      variant: 'filled'
-    },
-    error: {
-      label: 'Error',
-      color: 'error',
-      variant: 'filled'
-    }
-  };
-
-  const config = statusConfig[status] || statusConfig.inactive;
-
-  return (
-    <Chip 
-      label={config.label}
-      color={config.color}
-      variant={config.variant}
-      size="small"
-      sx={{ 
-        fontWeight: 600,
-        fontSize: '0.7rem',
-        height: 24
-      }}
-    />
-  );
-};
-
 export default function MapContainer({ devices, locations, onDeviceClick, selectedDevice }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [popupOpen, setPopupOpen] = useState(null);
+  const [showDistances, setShowDistances] = useState(false);
   const center = [-3.3731, 29.3644]; // Bujumbura
 
-  const createCustomIcon = (device, isSelected) => {
-    const getStatusColor = () => {
-      if (isSelected) return theme.palette.primary.main;
+  // Calculate distances between all devices and center point
+  const deviceDistances = useMemo(() => {
+    return devices.map(device => {
+      const location = locations.find(l => l.device === device.id);
+      if (!location) return { ...device, distance: null };
       
-      switch (device.status) {
-        case 'active':
-          return theme.palette.success.main;
-        case 'warning':
-          return theme.palette.warning.main;
-        case 'error':
-          return theme.palette.error.main;
-        default:
-          return theme.palette.grey[500];
-      }
-    };
-
-    const color = getStatusColor();
-    
-    return L.divIcon({
-      className: 'custom-marker',
-      html: `
-        <div style="
-          background-color: ${color};
-          width: ${isSelected ? '40px' : '32px'};
-          height: ${isSelected ? '40px' : '32px'};
-          border-radius: 50%;
-          border: 3px solid white;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: ${isSelected ? '14px' : '12px'};
-          color: white;
-          font-weight: bold;
-          transition: all 0.3s ease;
-          cursor: pointer;
-          transform: ${isSelected ? 'scale(1.1)' : 'scale(1)'};
-        ">
-          ${device.unit_name.charAt(0).toUpperCase()}
-        </div>
-      `,
-      iconSize: isSelected ? [40, 40] : [32, 32],
-      iconAnchor: isSelected ? [20, 20] : [16, 16],
+      const distance = calculateDistance(
+        center[0], center[1],
+        location.latitude, location.longitude
+      );
+      
+      return {
+        ...device,
+        distance: distance.toFixed(2)
+      };
     });
-  };
+  }, [devices, locations]);
+
+  // Calculate distance between selected device and others
+  const selectedDeviceDistance = useMemo(() => {
+    if (!selectedDevice) return null;
+    
+    const selected = locations.find(l => l.device === selectedDevice);
+    if (!selected) return null;
+    
+    return devices.map(device => {
+      if (device.id === selectedDevice) return null;
+      const location = locations.find(l => l.device === device.id);
+      if (!location) return null;
+      
+      const distance = calculateDistance(
+        selected.latitude, selected.longitude,
+        location.latitude, location.longitude
+      );
+      
+      return {
+        deviceId: device.id,
+        distance: distance.toFixed(2),
+        position: [location.latitude, location.longitude]
+      };
+    }).filter(Boolean);
+  }, [selectedDevice, devices, locations]);
 
   const handlePopupOpen = (deviceId) => {
     setPopupOpen(deviceId);
@@ -169,10 +74,8 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
     setPopupOpen(null);
   };
 
-  const getDeviceStatus = (device) => {
-    if (device.battery_level < 20) return 'error';
-    if (device.battery_level < 40) return 'warning';
-    return device.status || 'active';
+  const handleExport = () => {
+    exportToCSV(deviceDistances, locations);
   };
 
   return (
@@ -184,6 +87,204 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
       overflow: 'hidden',
       boxShadow: theme.shadows[3]
     }}>
+      {/* Control Panel */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          zIndex: 1000,
+          display: 'flex',
+          gap: 1,
+          flexDirection: 'column'
+        }}
+      >
+        <Tooltip title="Export to CSV">
+          <Button
+            variant="contained"
+            startIcon={<Download />}
+            onClick={handleExport}
+            size="small"
+            sx={{
+              backgroundColor: 'white',
+              color: theme.palette.primary.main,
+              '&:hover': {
+                backgroundColor: theme.palette.grey[100]
+              },
+              boxShadow: theme.shadows[2]
+            }}
+          >
+            Export
+          </Button>
+        </Tooltip>
+        
+        <Tooltip title={showDistances ? "Hide distances" : "Show distances"}>
+          <Button
+            variant="contained"
+            startIcon={<Straighten />}
+            onClick={() => setShowDistances(!showDistances)}
+            size="small"
+            sx={{
+              backgroundColor: showDistances ? theme.palette.primary.main : 'white',
+              color: showDistances ? 'white' : theme.palette.primary.main,
+              '&:hover': {
+                backgroundColor: showDistances ? theme.palette.primary.dark : theme.palette.grey[100]
+              },
+              boxShadow: theme.shadows[2]
+            }}
+          >
+            Distance
+          </Button>
+        </Tooltip>
+      </Box>
+
+      {/* Device Legend - Shows all devices with their unique colors */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 16,
+          left: 16,
+          zIndex: 1000,
+          backgroundColor: 'rgba(255, 255, 255, 0.97)',
+          padding: 2,
+          borderRadius: 2,
+          boxShadow: theme.shadows[4],
+          maxHeight: isMobile ? '250px' : '450px',
+          overflowY: 'auto',
+          minWidth: isMobile ? '200px' : '280px',
+          maxWidth: isMobile ? '200px' : '320px',
+          '&::-webkit-scrollbar': {
+            width: '6px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: '#f1f1f1',
+            borderRadius: '10px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: '#888',
+            borderRadius: '10px',
+          },
+          '&::-webkit-scrollbar-thumb:hover': {
+            background: '#555',
+          },
+        }}
+      >
+        <Typography variant="subtitle2" fontWeight={700} mb={1.5} sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          borderBottom: `2px solid ${theme.palette.divider}`,
+          pb: 1
+        }}>
+          <span>Devices ({devices.length})</span>
+          <Box sx={{ 
+            width: 8, 
+            height: 8, 
+            borderRadius: '50%', 
+            backgroundColor: theme.palette.success.main,
+            animation: 'pulse 2s infinite'
+          }} />
+        </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {deviceDistances.map((device, index) => {
+            const config = getDeviceConfig(device);
+            const isSelected = selectedDevice === device.id;
+            const deviceStatus = getDeviceStatus(device);
+            
+            return (
+              <Box 
+                key={device.id}
+                onClick={() => onDeviceClick(device.id)}
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 1.5,
+                  padding: 1,
+                  borderRadius: 1,
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? `${config.color}15` : 'transparent',
+                  border: `2px solid ${isSelected ? config.color : 'transparent'}`,
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    backgroundColor: `${config.color}10`,
+                    transform: 'translateX(4px)'
+                  }
+                }}
+              >
+                <Box sx={{ 
+                  minWidth: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${config.color} 0%, ${config.color}dd 100%)`,
+                  border: '2px solid white',
+                  boxShadow: `0 2px 8px ${config.color}40`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px',
+                  flexShrink: 0
+                }}>
+                  {config.icon}
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: isSelected ? 700 : 600,
+                      color: theme.palette.text.primary,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      fontSize: '0.85rem'
+                    }}
+                  >
+                    {device.device_name}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: theme.palette.text.secondary,
+                      display: 'block',
+                      fontSize: '0.7rem'
+                    }}
+                  >
+                    {device.device_code}
+                  </Typography>
+                </Box>
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'flex-end',
+                  gap: 0.5
+                }}>
+                  {device.distance && (
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        fontWeight: 700,
+                        color: config.color,
+                        fontSize: '0.7rem'
+                      }}
+                    >
+                      {device.distance}km
+                    </Typography>
+                  )}
+                  <Box sx={{ 
+                    width: 8, 
+                    height: 8, 
+                    borderRadius: '50%',
+                    backgroundColor: deviceStatus === 'active' ? theme.palette.success.main :
+                                   deviceStatus === 'warning' ? theme.palette.warning.main :
+                                   deviceStatus === 'error' ? theme.palette.error.main :
+                                   theme.palette.grey[400]
+                  }} />
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+      </Box>
+
       <LeafletMap
         center={center}
         zoom={13}
@@ -194,19 +295,41 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
         <MapInvalidator />
         <ModernTileLayer />
         
-        {devices.map((device) => {
+        {/* Draw lines between selected device and others */}
+        {showDistances && selectedDevice && selectedDeviceDistance?.map((dist) => {
+          const selectedLoc = locations.find(l => l.device === selectedDevice);
+          if (!selectedLoc) return null;
+          
+          return (
+            <Polyline
+              key={`line-${dist.deviceId}`}
+              positions={[
+                [selectedLoc.latitude, selectedLoc.longitude],
+                dist.position
+              ]}
+              color={theme.palette.primary.main}
+              weight={2}
+              opacity={0.6}
+              dashArray="5, 10"
+            />
+          );
+        })}
+        
+        {deviceDistances.map((device) => {
           const location = locations.find(l => l.device === device.id);
           if (!location) return null;
           
           const deviceStatus = getDeviceStatus(device);
           const isSelected = selectedDevice === device.id;
           const isPopupOpen = popupOpen === device.id;
+          
+          const distanceToSelected = selectedDeviceDistance?.find(d => d.deviceId === device.id);
 
           return (
             <Marker
               key={device.id}
               position={[location.latitude, location.longitude]}
-              icon={createCustomIcon({ ...device, status: deviceStatus }, isSelected)}
+              icon={createCustomIcon({ ...device, status: deviceStatus }, isSelected, theme)}
               eventHandlers={{
                 click: () => onDeviceClick(device.id),
                 popupopen: () => handlePopupOpen(device.id),
@@ -222,7 +345,7 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
                 <Fade in={isPopupOpen}>
                   <Card 
                     sx={{ 
-                      minWidth: 250,
+                      minWidth: 280,
                       border: `2px solid ${
                         isSelected ? theme.palette.primary.main : theme.palette.grey[200]
                       }`,
@@ -249,6 +372,35 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
                       </Box>
                       
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                            Device Code
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                            {device.device_code}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                            IMEI
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                            {device.imei}
+                          </Typography>
+                        </Box>
+
+                        {device.unit_name && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                              Unit
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {device.unit_name}
+                            </Typography>
+                          </Box>
+                        )}
+
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                             Status
@@ -292,17 +444,58 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
                             </Typography>
                           </Box>
                         </Box>
-                        
-                        {device.last_update && (
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                            Distance from center
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: theme.palette.primary.main }}>
+                            {device.distance} km
+                          </Typography>
+                        </Box>
+
+                        {distanceToSelected && (
+                          <Box sx={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            pt: 1,
+                            borderTop: `1px solid ${theme.palette.divider}`
+                          }}>
                             <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                              Last Update
+                              Distance to selected
                             </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {new Date(device.last_update).toLocaleTimeString()}
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.secondary.main }}>
+                              {distanceToSelected.distance} km
                             </Typography>
                           </Box>
                         )}
+                        
+                        {device.last_seen && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                              Last Seen
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {new Date(device.last_seen).toLocaleTimeString()}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        <Box sx={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center',
+                          pt: 1,
+                          borderTop: `1px solid ${theme.palette.divider}`
+                        }}>
+                          <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                            Coordinates
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                            {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                          </Typography>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>
@@ -313,19 +506,20 @@ export default function MapContainer({ devices, locations, onDeviceClick, select
         })}
       </LeafletMap>
       
-      {/* Map attribution footer */}
+      {/* Map info footer */}
       <Box
         sx={{
           position: 'absolute',
           bottom: 8,
-          right: 8,
+          left: 8,
           backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          padding: '4px 8px',
+          padding: '6px 12px',
           borderRadius: 1,
           zIndex: 1000,
         }}
       >
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" fontWeight={600} color="text.primary">
+          Total Devices: {devices.length} | Active: {devices.filter(d => getDeviceStatus(d) === 'active').length}
         </Typography>
       </Box>
     </Box>
