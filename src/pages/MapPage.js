@@ -113,12 +113,12 @@ export default function MapPage() {
         />
       </Box>
 
-      {/* Device Info Panel */}
+      {/* Device Info Panel
       <DeviceInfoPanel
         device={selectedDeviceData}
         location={selectedLocation}
         onClose={() => setSelectedDevice(null)}
-      />
+      /> */}
 
       {/* Statistics Card */}
       <StatisticsCard
