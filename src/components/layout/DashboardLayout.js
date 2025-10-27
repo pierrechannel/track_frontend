@@ -135,8 +135,9 @@ export default function DashboardLayout() {
       color: '#f59e0b',
       badge: alerts.filter(a => !a.acknowledged).length 
     },
+    { name: 'Users', path: '/users', icon: ManageAccounts, color: '#10b981' }, 
     { name: 'Analytics', path: '/analytics', icon: AnalyticsIcon, color: '#10b981' },
-    { name: 'Users', path: '/users', icon: ManageAccounts, color: '#10b981' }, // Settings focus
+    // Settings focus
   ];
 
   const unacknowledgedCount = alerts.filter(a => !a.acknowledged).length;
