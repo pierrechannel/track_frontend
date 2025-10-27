@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000/api';
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const LOGIN_API_URL = process.env.REACT_APP_API_URL || API_BASE_URL;
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -49,7 +50,7 @@ apiClient.interceptors.response.use(
       
       if (refreshToken) {
         try {
-          const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+          const response = await axios.post(`${LOGIN_API_URL}/auth/token/refresh/`, {
             refresh: refreshToken,
           });
           localStorage.setItem('access_token', response.data.access);
@@ -72,9 +73,9 @@ apiClient.interceptors.response.use(
 
 export const authAPI = {
   login: (username, password) =>
-    apiClient.post('/auth/token/', { username, password }),
+    axios.post(`${LOGIN_API_URL}/auth/token/`, { username, password }),
   refreshToken: (refresh) => 
-    apiClient.post('/auth/token/refresh/', { refresh }),
+    axios.post(`${LOGIN_API_URL}/auth/token/refresh/`, { refresh }),
   getCurrentUser: () => apiClient.get('/auth/user/'),
 };
 
